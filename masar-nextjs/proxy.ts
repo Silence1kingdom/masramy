@@ -5,7 +5,7 @@ const protectedRoutes = ['/admin', '/instructor', '/dashboard', '/profile', '/st
 const adminRoutes = ['/admin']
 const instructorRoutes = ['/instructor']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { supabase, supabaseResponse } = createClient(request)
   const { data: { user: supabaseUser } } = await supabase.auth.getUser()
 

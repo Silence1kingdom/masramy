@@ -14,6 +14,9 @@ const nextConfig = {
       },
     ],
   },
+  outputFileTracingIncludes: {
+    "*": ["./node_modules/@swc/helpers/esm/**"],
+  },
   serverExternalPackages: ['@prisma/client', '@prisma/adapter-pg'],
   turbopack: {
     root: path.resolve(__dirname),
