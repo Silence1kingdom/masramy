@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     const tokens = generateTokenPair({ userId: user.id, email: user.email, role: user.role })
 
     return apiSuccess({
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, avatar: user.avatar, role: user.role },
       ...tokens,
     })
   } catch (error: any) {

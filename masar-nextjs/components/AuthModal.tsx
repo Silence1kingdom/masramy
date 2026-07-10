@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react'
 import { useAuth } from './AuthContext'
-import { getSupabase } from '@/lib/supabase-auth'
+import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 
 interface AuthModalContextType {
@@ -56,7 +56,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
     setGoogleLoading(true)
     setError('')
     try {
-      const supabase = getSupabase()
+      const supabase = createClient()
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

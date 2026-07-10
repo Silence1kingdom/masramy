@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react'
 
 interface User {
   id: number
@@ -27,24 +27,85 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
+  const fetchedMeRef = useRef<string | null>(null)
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const setAuthCookie = useCallback((tokenValue: string) => {
+    document.cookie = `accessToken=${tokenValue}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+  }, [])
+
+  const clearAuthCookie = useCallback(() => {
+    document.cookie = 'accessToken=; path=/; max-age=0'
+  }, [])
+
+  const fetchUser = useCallback(async (tokenValue: string) => {
+    if (fetchedMeRef.current === tokenValue) return
+    fetchedMeRef.current = tokenValue
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${tokenValue}` }
+      })
+      const data = await res.json()
+      if (data.success && data.data?.user) {
+        const u = data.data.user as User
+        setUser(prev => {
+          const updated = { ...prev, ...u } as User
+          localStorage.setItem('user', JSON.stringify(updated))
+          return updated
+        })
+      } else {
+        logout()
+      }
+    } catch {
+      fetchedMeRef.current = null
+    }
+  }, [])
+
+  const scheduleRefresh = useCallback((refreshToken: string, currentToken: string) => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+
+    try {
+      const payload = JSON.parse(atob(currentToken.split('.')[1]))
+      const expiresIn = (payload.exp * 1000) - Date.now()
+      const refreshIn = Math.max(expiresIn - 60 * 60 * 1000, 60 * 1000)
+
+      refreshTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken })
+          })
+          const data = await res.json()
+          if (data.success && data.data) {
+            localStorage.setItem('accessToken', data.data.accessToken)
+            localStorage.setItem('refreshToken', data.data.refreshToken)
+            setToken(data.data.accessToken)
+            setAuthCookie(data.data.accessToken)
+            fetchedMeRef.current = null
+            scheduleRefresh(data.data.refreshToken, data.data.accessToken)
+          } else {
+            logout()
+          }
+        } catch {
+          logout()
+        }
+      }, refreshIn)
+    } catch {
+      logout()
+    }
+  }, [setAuthCookie])
 
   useEffect(() => {
-    // Check if returning from Google OAuth
     const params = new URLSearchParams(window.location.search)
-    const googleToken = params.get('token')
-    const googleRefresh = params.get('refresh')
     const isGoogleAuth = params.get('google_auth') === 'true'
 
-    if (isGoogleAuth && googleToken) {
-      // Clean URL
+    if (isGoogleAuth) {
       window.history.replaceState({}, '', window.location.pathname)
-
-      // Fetch user info from /api/auth/me
-      fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${googleToken}` }
-      }).then(r => r.json()).then(data => {
+      fetch('/api/auth/me').then(r => r.json()).then(data => {
         if (data.success && data.data?.user) {
-          saveAuth(data.data.user, googleToken, googleRefresh || undefined)
+          setUser(data.data.user)
+          localStorage.setItem('user', JSON.stringify(data.data.user))
         }
       }).catch(() => {})
       return
@@ -53,59 +114,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const savedToken = localStorage.getItem('accessToken')
     const savedRefresh = localStorage.getItem('refreshToken')
     const savedUser = localStorage.getItem('user')
-    if (savedToken && savedUser) {
-      setToken(savedToken)
-      setUser(JSON.parse(savedUser))
 
-      if (savedRefresh) {
-        fetch('/api/auth/refresh', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: savedRefresh })
-        }).then(r => r.json()).then(data => {
-          if (data.success && data.data) {
-            localStorage.setItem('accessToken', data.data.accessToken)
-            localStorage.setItem('refreshToken', data.data.refreshToken)
-            setToken(data.data.accessToken)
-            setAuthCookie(data.data.accessToken)
+    if (savedToken && savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser)
+        setUser(parsedUser)
+        setToken(savedToken)
+        setAuthCookie(savedToken)
+
+        try {
+          const payload = JSON.parse(atob(savedToken.split('.')[1]))
+          if (payload.exp && payload.exp * 1000 < Date.now()) {
+            if (savedRefresh) {
+              fetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken: savedRefresh })
+              }).then(r => r.json()).then(data => {
+                if (data.success && data.data) {
+                  localStorage.setItem('accessToken', data.data.accessToken)
+                  localStorage.setItem('refreshToken', data.data.refreshToken)
+                  setToken(data.data.accessToken)
+                  setAuthCookie(data.data.accessToken)
+                  scheduleRefresh(data.data.refreshToken, data.data.accessToken)
+                } else {
+                  logout()
+                }
+              }).catch(() => {})
+            } else {
+              logout()
+            }
+          } else {
+            if (savedRefresh) scheduleRefresh(savedRefresh, savedToken)
           }
-        }).catch(() => {})
+        } catch {
+          logout()
+        }
+      } catch {
+        localStorage.removeItem('user')
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
       }
     }
   }, [])
 
   useEffect(() => {
     if (!token) return
-    fetch('/api/auth/me', {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(r => r.json()).then(data => {
-      if (data.success && data.data?.user) {
-        const u = data.data.user
-        setUser(prev => {
-          const updated = { ...prev, ...u } as User
-          localStorage.setItem('user', JSON.stringify(updated))
-          return updated
-        })
-      }
-    }).catch(() => {})
-  }, [token])
+    fetchUser(token)
+  }, [token, fetchUser])
 
-  const setAuthCookie = (token: string) => {
-    document.cookie = `accessToken=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
-  }
-
-  const clearAuthCookie = () => {
-    document.cookie = 'accessToken=; path=/; max-age=0'
-  }
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    }
+  }, [])
 
   const saveAuth = useCallback((userData: User, accessToken: string, refreshToken?: string) => {
     setUser(userData)
     setToken(accessToken)
+    fetchedMeRef.current = null
     localStorage.setItem('accessToken', accessToken)
     localStorage.setItem('user', JSON.stringify(userData))
     if (refreshToken) localStorage.setItem('refreshToken', refreshToken)
     setAuthCookie(accessToken)
-  }, [])
+    if (refreshToken) scheduleRefresh(refreshToken, accessToken)
+  }, [setAuthCookie, scheduleRefresh])
 
   const login = async (email: string, password: string): Promise<string | null> => {
     try {
@@ -164,14 +237,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null)
     setToken(null)
+    fetchedMeRef.current = null
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
     clearAuthCookie()
-  }
+  }, [clearAuthCookie])
 
   return (
     <AuthContext.Provider value={{ user, token, login, register, googleLogin, logout, updateUser, isAuthenticated: !!user }}>

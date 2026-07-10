@@ -36,11 +36,10 @@ export async function GET(request: Request) {
         const tokens = generateTokenPair({ userId: user.id, email: user.email, role: user.role })
 
         const redirectUrl = new URL(`${origin}${next}`)
-        redirectUrl.searchParams.set('token', tokens.accessToken)
-        redirectUrl.searchParams.set('refresh', tokens.refreshToken)
         redirectUrl.searchParams.set('google_auth', 'true')
 
         const response = NextResponse.redirect(redirectUrl.toString())
+
         response.cookies.set('accessToken', tokens.accessToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
@@ -48,6 +47,15 @@ export async function GET(request: Request) {
           maxAge: 60 * 60 * 24 * 7,
           path: '/',
         })
+
+        response.cookies.set('refreshToken', tokens.refreshToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+
         return response
       }
     }

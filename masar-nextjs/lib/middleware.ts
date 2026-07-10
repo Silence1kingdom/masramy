@@ -33,16 +33,27 @@ export interface ApiResponse<T = any> {
 
 // ─── Auth ────────────────────────────────────────────
 export async function getAuthUser(request: Request): Promise<AuthResult | NextResponse> {
-  const authHeader = request.headers.get('authorization')
+  let token: string | null = null
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1]
+  }
+
+  if (!token) {
+    const cookieHeader = request.headers.get('cookie') || ''
+    const match = cookieHeader.match(/accessToken=([^;]+)/)
+    if (match) {
+      token = match[1]
+    }
+  }
+
+  if (!token) {
     return NextResponse.json(
       { success: false, error: 'يجب تسجيل الدخول أولاً' },
       { status: 401 }
     )
   }
-
-  const token = authHeader.split(' ')[1]
   const payload = verifyToken(token)
 
   if (!payload) {

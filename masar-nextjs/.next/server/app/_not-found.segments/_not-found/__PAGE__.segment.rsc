@@ -1,0 +1,6 @@
+1:"$Sreact.fragment"
+2:I[22016,["/_next/static/chunks/3u_4js19_taz3.js","/_next/static/chunks/3r9m0dfcruj9w.js","/_next/static/chunks/18sotvvmcs59d.js"],""]
+3:I[97367,["/_next/static/chunks/3u_4js19_taz3.js","/_next/static/chunks/3r9m0dfcruj9w.js","/_next/static/chunks/18sotvvmcs59d.js"],"OutletBoundary"]
+4:"$Sreact.suspense"
+0:{"rsc":["$","$1","c",{"children":[["$","div",null,{"className":"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center","children":[["$","i",null,{"className":"fa-solid fa-map-signs text-6xl text-indigo-300 mb-6"}],["$","h1",null,{"className":"text-5xl font-extrabold text-gray-900 mb-4","children":"404"}],["$","p",null,{"className":"text-xl text-gray-500 mb-2","children":"الصفحة التي تبحث عنها غير موجودة"}],["$","p",null,{"className":"text-gray-400 mb-8","children":"ربما تم نقل الصفحة أو حذفها"}],["$","$L2",null,{"href":"/","className":"bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-semibold transition inline-flex items-center gap-2","children":[["$","i",null,{"className":"fa-solid fa-house"}]," العودة للرئيسية"]}]]}],null,["$","$L3",null,{"children":["$","$4",null,{"name":"Next.MetadataOutlet","children":"$@5"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"qi_PpPasRDZo1wJ1bkQic"}
+5:null

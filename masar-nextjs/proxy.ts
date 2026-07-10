@@ -9,27 +9,38 @@ export async function proxy(request: NextRequest) {
   try {
     const { supabase, supabaseResponse } = createClient(request)
     const { data } = await supabase.auth.getUser()
-    const supabaseUser = data?.user
 
     const { pathname } = request.nextUrl
 
     const isProtected = protectedRoutes.some(route => pathname.startsWith(route))
     if (!isProtected) return supabaseResponse
 
-    let role: string | null = null
-
     const token = request.cookies.get('accessToken')?.value ||
       request.headers.get('authorization')?.replace('Bearer ', '')
 
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        role = payload.role
-      } catch {}
+    if (!token) {
+      const url = new URL('/', request.url)
+      url.searchParams.set('auth', 'required')
+      url.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(url)
     }
 
-    if (!role && supabaseUser) {
-      role = (supabaseUser.user_metadata?.role as string) || 'student'
+    let role: string | null = null
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        role = null
+      } else {
+        role = payload.role
+      }
+    } catch {
+      role = null
+    }
+
+    if (!role && data?.user) {
+      role = (data.user.user_metadata?.role as string) || 'student'
     }
 
     if (!role) {
@@ -55,6 +66,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

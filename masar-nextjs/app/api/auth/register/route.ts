@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const hashedPassword = await hashPassword(password)
     const user = await prisma.user.create({
       data: { name, email, password: hashedPassword },
-      select: { id: true, name: true, email: true, role: true, createdAt: true }
+      select: { id: true, name: true, email: true, avatar: true, role: true, createdAt: true }
     })
 
     const tokens = generateTokenPair({ userId: user.id, email: user.email, role: user.role })
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const welcome = welcomeEmail(name)
     sendEmail({ to: email, subject: welcome.subject, html: welcome.html }).catch(() => {})
 
-    return apiSuccess({ user: { id: user.id, name: user.name, email: user.email, role: user.role }, ...tokens }, 201)
+    return apiSuccess({ user: { id: user.id, name: user.name, email: user.email, avatar: user.avatar, role: user.role }, ...tokens }, 201)
   } catch (error: any) {
     console.error('Register error:', error)
     return apiError(error.code === 'P2002' ? 'البريد الإلكتروني مستخدم بالفعل' : 'حدث خطأ أثناء التسجيل', 500)

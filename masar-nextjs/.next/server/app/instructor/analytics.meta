@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/instructor/layout,_N_T_/instructor/analytics/layout,_N_T_/instructor/analytics/page,_N_T_/instructor/analytics"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/instructor/analytics/__PAGE__",
+    "/instructor/analytics",
+    "/instructor",
+    "/_index",
+    "/_head"
+  ]
+}
