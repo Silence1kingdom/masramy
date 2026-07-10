@@ -6,46 +6,51 @@ const adminRoutes = ['/admin']
 const instructorRoutes = ['/instructor']
 
 export async function proxy(request: NextRequest) {
-  const { supabase, supabaseResponse } = createClient(request)
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser()
+  try {
+    const { supabase, supabaseResponse } = createClient(request)
+    const { data } = await supabase.auth.getUser()
+    const supabaseUser = data?.user
 
-  const { pathname } = request.nextUrl
+    const { pathname } = request.nextUrl
 
-  const isProtected = protectedRoutes.some(route => pathname.startsWith(route))
-  if (!isProtected) return supabaseResponse
+    const isProtected = protectedRoutes.some(route => pathname.startsWith(route))
+    if (!isProtected) return supabaseResponse
 
-  let role: string | null = null
+    let role: string | null = null
 
-  const token = request.cookies.get('accessToken')?.value ||
-    request.headers.get('authorization')?.replace('Bearer ', '')
+    const token = request.cookies.get('accessToken')?.value ||
+      request.headers.get('authorization')?.replace('Bearer ', '')
 
-  if (token) {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      role = payload.role
-    } catch {}
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        role = payload.role
+      } catch {}
+    }
+
+    if (!role && supabaseUser) {
+      role = (supabaseUser.user_metadata?.role as string) || 'student'
+    }
+
+    if (!role) {
+      const url = new URL('/', request.url)
+      url.searchParams.set('auth', 'required')
+      url.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(url)
+    }
+
+    if (adminRoutes.some(route => pathname.startsWith(route)) && role !== 'admin') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+
+    if (instructorRoutes.some(route => pathname.startsWith(route)) && role !== 'instructor' && role !== 'admin') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+
+    return supabaseResponse
+  } catch {
+    return NextResponse.next()
   }
-
-  if (!role && supabaseUser) {
-    role = (supabaseUser.user_metadata?.role as string) || 'student'
-  }
-
-  if (!role) {
-    const url = new URL('/', request.url)
-    url.searchParams.set('auth', 'required')
-    url.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(url)
-  }
-
-  if (adminRoutes.some(route => pathname.startsWith(route)) && role !== 'admin') {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
-  if (instructorRoutes.some(route => pathname.startsWith(route)) && role !== 'instructor' && role !== 'admin') {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
-  return supabaseResponse
 }
 
 export const config = {
